@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>온라인 마리오 술래잡기</title>
-    <!-- Supabase JS 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
@@ -28,6 +27,13 @@
             padding: 10px;
             font-size: 16px;
             margin: 5px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        #lobby button {
+            cursor: pointer;
+            font-weight: bold;
         }
 
         #status-board {
@@ -50,7 +56,6 @@
 </head>
 <body>
 
-    <!-- 1. 로그인/역할 선택 로비 -->
     <div id="lobby">
         <h1>마리오 술래잡기 온라인</h1>
         <p>닉네임을 입력하고 역할을 골라 입장하세요.</p>
@@ -60,7 +65,6 @@
         <button onclick="joinGame('runner')" style="background-color: #00b050; color: white;">도망자(Runner)로 참여</button>
     </div>
 
-    <!-- 2. 게임 화면 -->
     <div id="game-container" class="hidden">
         <div id="status-board">
             <div id="role-display">내 역할: </div>
@@ -74,15 +78,15 @@
     </div>
 
     <script>
-        // --- [Supabase 설정 필수 입력] ---
-        const SUPABASE_URL = "sb_publishable_s146TPpN6nDxNaPlQ3B26g_wnuGtQxA"; 
+        // --- [Supabase 설정 완료] ---
+        const SUPABASE_URL = "https://eubsrquhcjampfxlgulf.supabase.co"; 
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1YnNycXVoY2phbXBmeGxndWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjUyMDIsImV4cCI6MjA5OTE0MTIwMn0.FfuQ18i8Za46ng4XsNwWI52ZZHGwTPEVGHJ-s8rfcIs";
         
         let supabase;
         try {
             supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         } catch(e) {
-            console.error("Supabase 초기화 실패. URL과 Key를 확인하세요.");
+            console.error("Supabase 초기화 실패:", e);
         }
 
         // --- 게임 내부 변수 ---
@@ -90,18 +94,17 @@
         const ctx = canvas.getContext('2d');
         const GRAVITY = 0.5;
 
-        let myId = Math.random().toString(36).substring(2, 9); // 고유 세션 ID
+        let myId = Math.random().toString(36).substring(2, 9);
         let myPlayer = {
             id: myId, name: '', role: '', x: 50, y: 300, 
             width: 30, height: 40, velocityX: 0, velocityY: 0, 
             speed: 4, jumpForce: 10, grounded: false, isDead: false, facing: 'right'
         };
 
-        let players = {}; // 다른 플레이어들의 정보 저장소
+        let players = {};
         let gameChannel;
-        let gameStartTime = null;
         let gameTimerInterval;
-        let timeRemaining = 180; // 3분 (180초)
+        let timeRemaining = 180; // 3분
         let isGameActive = true;
 
         const platforms = [
@@ -115,14 +118,13 @@
         const keys = {};
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
-            // E키 입력 처리 (술래이고 살아있을 때만)
             if (e.code === 'KeyE' && myPlayer.role === 'chaser' && !myPlayer.isDead && isGameActive) {
                 attack();
             }
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // --- 로비 및 게임 조인 ---
+        // --- 게임 참가 로직 ---
         function joinGame(chosenRole) {
             const nameInput = document.getElementById('username').value.trim();
             if (!nameInput) return alert("닉네임을 입력해주세요!");
@@ -130,13 +132,12 @@
             myPlayer.name = nameInput;
             myPlayer.role = chosenRole;
 
-            // 역할별 스폰 위치 및 속도 차별화
             if (chosenRole === 'chaser') {
-                myPlayer.x = 700; // 술래는 오른쪽 끝 스폰
-                myPlayer.speed = 4.5; // 술래가 살짝 더 빠름
+                myPlayer.x = 700;
+                myPlayer.speed = 4.5;
                 document.getElementById('role-display').innerText = `내 역할: 🔴 술래 (${myPlayer.name})`;
             } else {
-                myPlayer.x = 100; // 도망자는 왼쪽 끝 스폰
+                myPlayer.x = 100;
                 myPlayer.speed = 4.0;
                 document.getElementById('role-display').innerText = `내 역할: 🟢 도망자 (${myPlayer.name})`;
             }
@@ -149,16 +150,15 @@
             updateLoop();
         }
 
-        // --- 수파베이스 실시간 통신 설정 ---
+        // --- 실시간 네트워크 연결 ---
         function initSupabaseRealtime() {
             gameChannel = supabase.channel('room-1', {
-                config: { broadcast: { self: false } } // 내가 보낸 브로드캐스트는 내가 다시 안 받음
+                config: { broadcast: { self: false } }
             });
 
-            // 이벤트 리스너 등록
             gameChannel
                 .on('broadcast', { event: 'move' }, ({ payload }) => {
-                    players[payload.id] = payload; // 타 유저 위치 업데이트
+                    players[payload.id] = payload;
                 })
                 .on('broadcast', { event: 'kill' }, ({ payload }) => {
                     if (payload.targetId === myId) {
@@ -167,13 +167,12 @@
                     if (players[payload.targetId]) {
                         players[payload.targetId].isDead = true;
                     }
-                    alert(`💥 [${payload.targetName}] 가 술래에게 처형당했습니다!`);
+                    alert(`💥 [${payload.targetName}] 가 처형당했습니다!`);
                     checkWinConditions();
                 })
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
-                        // 참가 알림 및 주기적인 동기화 시작
-                        setInterval(sendPosition, 1000 / 30); // 초당 30번 위치 전송
+                        setInterval(sendPosition, 1000 / 30);
                     }
                 });
         }
@@ -187,7 +186,7 @@
             });
         }
 
-        // --- 타이머 기능 ---
+        // --- 3분 타이머 ---
         function startLocalTimer() {
             gameTimerInterval = setInterval(() => {
                 if (!isGameActive) return;
@@ -198,22 +197,17 @@
                 document.getElementById('timer-display').innerText = `남은 시간: ${mins}:${secs}`;
 
                 if (timeRemaining <= 0) {
-                    endGame('runners_win', '⏳ 3분 종료! 도망자가 생존하여 [도망자 승리]입니다!');
+                    endGame('runners_win', '⏳ 3분 종료! 도망자가 살아남아 [도망자 승리]!');
                 }
             }, 1000);
         }
 
-        // --- 술래 공격 메커니즘 (E 키) ---
+        // --- 술래 E키 칼 공격 판정 ---
         function attack() {
-            // 공격 범위 설정 (마리오 전방 40픽셀 내)
             let attackRange = 40;
-            let attackX = myPlayer.facing === 'right' ? myPlayer.x + myPlayer.width : myPlayer.x - attackRange;
-            
-            // 캔버스에 공격 이펙트용 임시 시각화 구현을 위해 현재 턴 무시하고 충돌 대상 탐색
             for (let id in players) {
                 let p = players[id];
                 if (p.role === 'runner' && !p.isDead) {
-                    // 바로 앞에 있고 Y축(높이)이 겹치는지 판정
                     let isCloseX = false;
                     if (myPlayer.facing === 'right') {
                         isCloseX = (p.x >= myPlayer.x && p.x <= myPlayer.x + myPlayer.width + attackRange);
@@ -224,13 +218,11 @@
                     let isCloseY = Math.abs(myPlayer.y - p.y) < 30;
 
                     if (isCloseX && isCloseY) {
-                        // 조건 일치 시 킬 이벤트 브로드캐스트
                         gameChannel.send({
                             type: 'broadcast',
                             event: 'kill',
                             payload: { chaserId: myId, targetId: p.id, targetName: p.name }
                         });
-                        
                         p.isDead = true;
                         checkWinConditions();
                     }
@@ -241,22 +233,13 @@
         // --- 승리 조건 검사 ---
         function checkWinConditions() {
             let activeRunners = 0;
-            
-            // 내 상태 검사
             if (myPlayer.role === 'runner' && !myPlayer.isDead) activeRunners++;
-            
-            // 다른 유저 상태 검사
             for (let id in players) {
-                if (players[id].role === 'runner' && !players[id].isDead) {
-                    activeRunners++;
-                }
+                if (players[id].role === 'runner' && !players[id].isDead) activeRunners++;
             }
 
-            document.getElementById('score-display').innerText = `생존 도망자: ${activeRunners}명`;
-
-            // 도망자가 한 명도 없다면 술래 승리!
             if (activeRunners === 0) {
-                endGame('chaser_win', '💀 모든 도망자가 사망했습니다! [술래 승리]!');
+                endGame('chaser_win', '💀 도망자 전멸! [술래 승리]!');
             }
         }
 
@@ -265,11 +248,10 @@
             clearInterval(gameTimerInterval);
             setTimeout(() => {
                 alert(message);
-                location.reload(); // 게임 리셋
+                location.reload();
             }, 100);
         }
 
-        // --- 물리 충돌 처리 ---
         function checkCollision(player, platform) {
             if (player.x < platform.x + platform.width &&
                 player.x + player.width > platform.x &&
@@ -284,11 +266,10 @@
             return null;
         }
 
-        // --- 메인 루프 (그리기 및 물리) ---
+        // --- 프레임 업데이트 루프 ---
         function updateLoop() {
             if (!isGameActive) return;
 
-            // 사망한 도망자는 조작 불가
             if (!myPlayer.isDead) {
                 if (keys['ArrowRight'] || keys['KeyD']) {
                     myPlayer.velocityX = myPlayer.speed;
@@ -321,70 +302,59 @@
                     }
                 }
             } else {
-                // 죽었으면 화면 바닥에 고정
                 myPlayer.velocityY += GRAVITY;
                 myPlayer.y += myPlayer.velocityY;
                 if (myPlayer.y > 330) { myPlayer.y = 330; myPlayer.velocityY = 0; }
             }
 
-            // 실시간UI 인원 갱신용
             let currentRunners = (myPlayer.role === 'runner' && !myPlayer.isDead) ? 1 : 0;
             for(let id in players) {
                 if(players[id].role === 'runner' && !players[id].isDead) currentRunners++;
             }
             document.getElementById('score-display').innerText = `생존 도망자: ${currentRunners}명`;
 
-            // --- 랜더링 파트 ---
+            // 그리기
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 발판 그리기
             ctx.fillStyle = '#b84418';
             for (let platform of platforms) {
                 ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
             }
 
-            // 다른 플레이어들 그리기
             for (let id in players) {
                 drawCharacter(players[id]);
             }
-
-            // 내 캐릭터 그리기
             drawCharacter(myPlayer);
 
             requestAnimationFrame(updateLoop);
         }
 
-        // --- 캐릭터 & 칼 무기 그리기 함수 ---
         function drawCharacter(p) {
             if (p.isDead) {
-                // 죽은 유저는 회색 유령처럼 묘사
                 ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
                 ctx.fillRect(p.x, p.y, p.width, p.height);
                 ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
                 ctx.fillText("👻 " + p.name, p.x - 10, p.y - 10);
                 return;
             }
 
-            // 역할별 색상 (술래: 빨강, 도망자: 초록)
             ctx.fillStyle = p.role === 'chaser' ? '#e60012' : '#00b050';
             ctx.fillRect(p.x, p.y, p.width, p.height);
             
-            // 눈 (보는 방향)
             ctx.fillStyle = '#ffffff';
             let eyeOffset = p.facing === 'right' ? 18 : 5;
             ctx.fillRect(p.x + eyeOffset, p.y + 8, 6, 6);
 
-            // 닉네임 표시
             ctx.fillStyle = 'white';
             ctx.font = '12px Arial';
             ctx.fillText(p.name, p.x - 5, p.y - 10);
 
-            // [핵심 기능] 술래 손에 들린 무기(칼) 그리기
             if (p.role === 'chaser') {
-                ctx.fillStyle = '#b0c4de'; // 은색 칼날
+                ctx.fillStyle = '#b0c4de';
                 let weaponX = p.facing === 'right' ? p.x + p.width + 2 : p.x - 12;
-                ctx.fillRect(weaponX, p.y + 18, 10, 4); // 칼날
-                ctx.fillStyle = '#8b4513'; // 갈색 손잡이
+                ctx.fillRect(weaponX, p.y + 18, 10, 4);
+                ctx.fillStyle = '#8b4513';
                 let handleX = p.facing === 'right' ? p.x + p.width - 2 : p.x - 2;
                 ctx.fillRect(handleX, p.y + 16, 4, 8);
             }
