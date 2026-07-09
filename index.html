@@ -78,7 +78,7 @@
     </div>
 
     <script>
-        // --- [Supabase 설정 완료] ---
+        // --- [Supabase 설정 필수 입력 - 한 줄로 완벽 정렬] ---
         const SUPABASE_URL = "https://eubsrquhcjampfxlgulf.supabase.co"; 
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1YnNycXVoY2phbXBmeGxndWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjUyMDIsImV4cCI6MjA5OTE0MTIwMn0.FfuQ18i8Za46ng4XsNwWI52ZZHGwTPEVGHJ-s8rfcIs";
         
@@ -104,7 +104,7 @@
         let players = {};
         let gameChannel;
         let gameTimerInterval;
-        let timeRemaining = 180; // 3분
+        let timeRemaining = 180; 
         let isGameActive = true;
 
         const platforms = [
@@ -124,7 +124,7 @@
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // --- 게임 참가 로직 ---
+        // --- 로비 및 게임 조인 ---
         function joinGame(chosenRole) {
             const nameInput = document.getElementById('username').value.trim();
             if (!nameInput) return alert("닉네임을 입력해주세요!");
@@ -150,8 +150,9 @@
             updateLoop();
         }
 
-        // --- 실시간 네트워크 연결 ---
+        // --- 수파베이스 실시간 통신 설정 ---
         function initSupabaseRealtime() {
+            if (!supabase) return;
             gameChannel = supabase.channel('room-1', {
                 config: { broadcast: { self: false } }
             });
@@ -167,7 +168,7 @@
                     if (players[payload.targetId]) {
                         players[payload.targetId].isDead = true;
                     }
-                    alert(`💥 [${payload.targetName}] 가 처형당했습니다!`);
+                    alert(`💥 [${payload.targetName}] 가 술래에게 처형당했습니다!`);
                     checkWinConditions();
                 })
                 .subscribe((status) => {
@@ -186,7 +187,7 @@
             });
         }
 
-        // --- 3분 타이머 ---
+        // --- 타이머 기능 ---
         function startLocalTimer() {
             gameTimerInterval = setInterval(() => {
                 if (!isGameActive) return;
@@ -197,12 +198,12 @@
                 document.getElementById('timer-display').innerText = `남은 시간: ${mins}:${secs}`;
 
                 if (timeRemaining <= 0) {
-                    endGame('runners_win', '⏳ 3분 종료! 도망자가 살아남아 [도망자 승리]!');
+                    endGame('runners_win', '⏳ 3분 종료! 도망자가 생존하여 [도망자 승리]입니다!');
                 }
             }, 1000);
         }
 
-        // --- 술래 E키 칼 공격 판정 ---
+        // --- 술래 공격 메커니즘 (E 키) ---
         function attack() {
             let attackRange = 40;
             for (let id in players) {
@@ -223,6 +224,7 @@
                             event: 'kill',
                             payload: { chaserId: myId, targetId: p.id, targetName: p.name }
                         });
+                        
                         p.isDead = true;
                         checkWinConditions();
                     }
@@ -234,12 +236,15 @@
         function checkWinConditions() {
             let activeRunners = 0;
             if (myPlayer.role === 'runner' && !myPlayer.isDead) activeRunners++;
+            
             for (let id in players) {
-                if (players[id].role === 'runner' && !players[id].isDead) activeRunners++;
+                if (players[id].role === 'runner' && !players[id].isDead) {
+                    activeRunners++;
+                }
             }
 
             if (activeRunners === 0) {
-                endGame('chaser_win', '💀 도망자 전멸! [술래 승리]!');
+                endGame('chaser_win', '💀 모든 도망자가 사망했습니다! [술래 승리]!');
             }
         }
 
@@ -266,7 +271,7 @@
             return null;
         }
 
-        // --- 프레임 업데이트 루프 ---
+        // --- 메인 루프 ---
         function updateLoop() {
             if (!isGameActive) return;
 
@@ -313,7 +318,6 @@
             }
             document.getElementById('score-display').innerText = `생존 도망자: ${currentRunners}명`;
 
-            // 그리기
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             ctx.fillStyle = '#b84418';
@@ -324,6 +328,7 @@
             for (let id in players) {
                 drawCharacter(players[id]);
             }
+
             drawCharacter(myPlayer);
 
             requestAnimationFrame(updateLoop);
@@ -351,10 +356,10 @@
             ctx.fillText(p.name, p.x - 5, p.y - 10);
 
             if (p.role === 'chaser') {
-                ctx.fillStyle = '#b0c4de';
+                ctx.fillStyle = '#b0c4de'; 
                 let weaponX = p.facing === 'right' ? p.x + p.width + 2 : p.x - 12;
-                ctx.fillRect(weaponX, p.y + 18, 10, 4);
-                ctx.fillStyle = '#8b4513';
+                ctx.fillRect(weaponX, p.y + 18, 10, 4); 
+                ctx.fillStyle = '#8b4513'; 
                 let handleX = p.facing === 'right' ? p.x + p.width - 2 : p.x - 2;
                 ctx.fillRect(handleX, p.y + 16, 4, 8);
             }
